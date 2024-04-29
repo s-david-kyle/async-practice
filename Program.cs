@@ -6,14 +6,15 @@ class Program
 {
     static void Main(string[] args)
     {
-        Console.WriteLine("Hello, World!");
+        AsyncLocal<int> asyncLocal = new();
         for (int i = 0; i < 1000; i++)
         {
+            asyncLocal.Value = i;
             int index = i; // Create a local variable and assign the value of i to it
-            MyThreadPool.QueueUserWorkItem(() =>
+            MyThreadPool.QueueUserWorkItem(delegate
             {
-                Console.WriteLine("Hello, World! " + index); // Use the local variable instead of i
-                Thread.Sleep(10);
+                Console.WriteLine(asyncLocal.Value); // Use the local variable instead of i
+                Thread.Sleep(1000);
             });
         }
 
@@ -23,10 +24,8 @@ class Program
 
 static class MyThreadPool
 {
-    public static readonly BlockingCollection<Action> s_workItems = new();
-    public static void QueueUserWorkItem(Action action) => s_workItems.Add(action);
-
-
+    public static readonly BlockingCollection<(Action, ExecutionContext?)> s_workItems = new();
+    public static void QueueUserWorkItem(Action action) => s_workItems.Add((action, ExecutionContext.Capture()));
 
     static MyThreadPool()
     {
@@ -36,9 +35,12 @@ static class MyThreadPool
             {
                 while (true)
                 {
-                    Action action = s_workItems.Take();
-                    Console.WriteLine(s_workItems.Count);
-                    action();
+                    (Action workItem, ExecutionContext? context) = s_workItems.Take();
+                    if (context is null)
+                        workItem();
+                    else
+                        ExecutionContext.Run(context, state => ((Action)state!).Invoke(), workItem);
+
                 }
             })
             { IsBackground = true }.Start();
