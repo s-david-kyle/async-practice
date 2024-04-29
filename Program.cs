@@ -1,4 +1,7 @@
 ﻿using System.Collections.Concurrent;
+using System.Configuration.Assemblies;
+using System.Runtime.InteropServices;
+using Microsoft.VisualBasic;
 
 namespace async;
 
@@ -14,12 +17,51 @@ class Program
             MyThreadPool.QueueUserWorkItem(delegate
             {
                 Console.WriteLine(asyncLocal.Value); // Use the local variable instead of i
-                Thread.Sleep(1000);
+                Thread.Sleep(100);
             });
         }
 
         Console.ReadLine();
     }
+    class MyTask
+    {
+        private bool _isCompleted;
+        private Exception? _exception;
+        private Action? _continuation;
+        private ExecutionContext? _context;
+
+
+
+        public bool IsCompleted
+        {
+            get
+            {
+                lock (this)
+                {
+                    return _isCompleted;
+                }
+            }
+        }
+        public void SetResult() => Complete(null);
+        public void SetException(Exception e) => Complete(e);
+
+        public void Complete(Exception? exception)
+        {
+            lock (this)
+            {
+                _isCompleted = true;
+                _exception = exception;
+            }
+            _continuation?.Invoke();
+        }
+
+        public void SetEcxeption(Exception e) { }
+        public void Wait() { }
+        public void ContinueWith(Action action) { }
+
+
+    }
+}
 }
 
 static class MyThreadPool
