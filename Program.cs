@@ -14,7 +14,7 @@ class Program
 
         List<MyTask> tasks = new();
 
-        for (int i = 0; i < 1000; i++)
+        for (int i = 0; i < 100; i++)
         {
             asyncLocal.Value = i;
             int index = i; // Create a local variable and assign the value of i to it
@@ -24,8 +24,8 @@ class Program
                 Thread.Sleep(100);
             }));
         }
+        MyTask.WhenAll(tasks).Wait();
 
-        Console.ReadLine();
     }
 
     class MyTask
@@ -122,6 +122,32 @@ class Program
                 }
                 t.SetResult();
             });
+
+            return t;
+        }
+
+        public static MyTask WhenAll(List<MyTask> tasks)
+        {
+            MyTask t = new();
+
+            if (tasks.Count == 0)
+            {
+                t.SetResult();
+            }
+            else
+            {
+                int remainingTasks = tasks.Count;
+                Action continuation = () =>
+                {
+                    if (Interlocked.Decrement(ref remainingTasks) == 0)
+                        t.SetResult();
+                };
+
+                foreach (MyTask task in tasks)
+                {
+                    task.ContinueWith(continuation);
+                }
+            }
 
             return t;
         }
